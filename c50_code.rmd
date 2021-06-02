@@ -1,0 +1,81 @@
+---
+title: "C50 Boosted Trees"
+output:
+  pdf_document:
+        number_sections: false
+  html_document:
+    df_print: paged
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries used
+```{r message=FALSE, warning=FALSE}
+#ROC Plot
+library(plotROC)
+library(pROC)
+library(tidyverse)
+library(caret)
+#c50 boosting classifier
+library(C50)
+library(tidyverse)
+library(mlbench)
+```
+
+```{r include=FALSE}
+train.norm <- read.csv("train_norm.csv")
+train.norm<- train.norm[-c(1)]
+valid.norm <- read.csv("valid_norm.csv")
+valid.norm<- valid.norm[-c(1)]
+test.norm <- read.csv("test_norm.csv")
+test.norm<- test.norm[-c(1)]
+```
+
+## Boosted C5 Classifiers 
+
+### A C5.0 model works by splitting the sample based on the field that provides the maximum information gain. Each subsample defined by the first split is then split again, usually based on a different field, and the process repeats until the subsamples cannot be split any further. Finally, the lowest-level splits are reexamined, and those that do not contribute significantly to the value of the model are removed or pruned.
+
+```{r}
+set.seed(1)
+#Implementing on the training set 
+#1. trial =100 means that 100 boosted iterations have been performed
+#2. rules =TRUE means that the tree is decomposed as a rule based model
+#3. Control parameters:
+# winnow = utilizing feature importance
+# subset = should the model evaluate groups of discrete predictors for splits
+# bands = If TRUE, the model orders the rules by their
+# affect on the error rate and groups the rules into the specified number of bands.
+# This modifies the output so that the effect on the error rate can be seen for the
+# groups of rules within a band
+# fuzzyThreshold= A logical toggle to evaluate possible advanced splits of the data
+# sample= A value between (0, .999) that specifies the random proportion of the data should
+# be used to train the model. 
+
+c5_model <- C50::C5.0( train.norm[-c(38)], as.factor(train.norm$y), trials=100, rules=TRUE, control=C5.0Control(winnow=TRUE, subset=TRUE, bands = 500, fuzzyThreshold = TRUE))
+
+#checking variable importance
+C5imp(c5_model, metric = "usage", pct = TRUE)
+
+#Training set Performance 
+c5boosting.predicted.classes <- c5_model %>% predict(train.norm) #prediction error for training 
+confusionMatrix(c5boosting.predicted.classes, as.factor(train.norm$y), positive= '1')
+ 
+#Validation Set Performance 
+c5.pred.valid <-   c5_model %>%  predict(valid.norm) #prediction error for training 
+cm.c5.valid <- confusionMatrix(c5.pred.valid , as.factor(valid.norm$y), positive= '1')
+cm.c5.valid
+c5.valid.res <- as.data.frame(cbind(as.numeric(as.character(c5.pred.valid)), valid.norm$y))
+colnames(c5.valid.res) <- c("predicted", "actual")
+#ROC Curve
+c5.roc <- ggplot(c5.valid.res, aes(d=actual, m=predicted))+ geom_roc(labels=FALSE)+style_roc() +ggtitle("Validation Set ROC for C50 Boosted Trees")
+c5.roc 
+
+#Prediciting on the test set given to us 
+test.norm$y <-c5_model%>% predict(test.norm)
+c5.res<- as.data.frame(cbind(test.norm$ID, as.numeric(as.character(test.norm$y))))
+res_names <- c("ID","y")
+colnames(c5.res)<- res_names
+```

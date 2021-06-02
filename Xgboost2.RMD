@@ -1,0 +1,207 @@
+---
+title: "Xgboost2"
+output:
+  pdf_document:
+        number_sections: false
+  html_document:
+    df_print: paged
+urlcolor: blue
+---
+
+
+```{r include=FALSE}
+setwd("C://Users//khan_//Documents//MABAN//ML//Competition")
+```
+
+```{r}
+data<-read.csv("train.csv", stringsAsFactors = FALSE, na.strings=c('na'))
+kaggle.test<-read.csv("test.csv", stringsAsFactors = FALSE, na.strings=c('na'))
+library(naniar)
+
+#Treat  NA'S 
+sanitize.data <- function(df) {
+  if("y" %in% colnames(df)) {
+    df$y<-as.factor(df$y)
+  }
+  for (i in 1:ncol(df)) { # For every column...
+    if (typeof(df[[i]]) == 'character') { # if the column type is character...
+      df[[i]] <- as.factor(df[[i]]) # Convert it to factor. 
+    }
+  }
+  df
+}
+
+#Create dummy variables 
+library(caret)
+
+add.dummies<-function(df) {
+  ohe_feats = c('job', 'marital', 'education', 'device', 'outcome_old')
+  
+  dummies <- dummyVars(~ job +  marital + education + device + outcome_old, data=df)
+  df_all_ohe <- as.data.frame(predict(dummies, newdata=df))
+  
+  for (var in ohe_feats) {
+    df<-df[,-c(grep(var, colnames(df)))]
+  }
+  cbind(df,df_all_ohe)
+}
+
+prepare.data<-function(df) {
+  df<-sanitize.data(df)
+  df<-add.dummies(df)
+}
+
+data.prep<-prepare.data(data)
+library(xgboost)
+library(readr)
+library(stringr)
+library(caret)
+library(car)
+library(dplyr)
+
+
+#Growing trees sequentially
+#Tuning parameters:
+# 1) Number of repetitions (Number of trees to build) NB-  do not choose too large. Use CV to choose this value (B)
+# 2) NUmber of splits in each tree - d=1 usually good. controls complexity
+# 3) Shrinkage parameter (lambda) - Usually small 0.01-0.001. Smaller values may need larger number of trees B
+
+#Idea: Fit trees to residuals and update 
+
+#Notes from prof: just fix lambda  and number of splits d and cross validate repetitions B!!!!!
+
+#Example taken from: https://rpubs.com/dalekube/XGBoost-Iris-Classification-Example-in-R
+
+library(xgboost)
+
+#Divide the given training data into working test and training sets (60% train and 40% test)
+set.seed(1)
+train.index<-sample(dim(data.prep)[1], 0.6*dim(data.prep[1]))
+train<-data[train.index, ]
+test<-data[-train.index, ]
+attach(train)
+
+train.matrix<-as.matrix(sapply(train[,-c(grep('y', colnames(train)))], as.numeric))
+test.matrix<-as.matrix(sapply(test[,-c(grep('y', colnames(test)))], as.numeric))
+
+label.train<-as.integer(train$y)
+label.test<-as.integer(test$y)
+if (sum(label.train == 2)) {
+  label.train<-label.train-1
+}
+if (sum(label.test == 2)) {
+  label.test<-label.test-1
+}
+xgb.train = xgb.DMatrix(data=train.matrix, label=label.train)
+xgb.test = xgb.DMatrix(data=test.matrix, label=label.test)
+
+evaluate.xgb<-function(ntrees) {
+  # Define the parameters for  classification
+  params = list(
+    booster="gbtree",
+    eta=0.005,
+    max_depth=4,
+    gamma=3,
+    subsample=0.75,
+    colsample_bytree=1,
+    objective="binary:logistic",
+    outputmargin=FALSE
+  )
+  
+  # Train the XGBoost classifer
+  xgb.fit=xgb.train(
+    params=params,
+    data=xgb.train,
+    nrounds=ntrees,
+    early_stopping_rounds=100,
+    watchlist=list(train=xgb.train,test=xgb.test),
+    verbose=0
+  )
+  
+  #Cross validation
+  #mdcv <-xgb.cv(data=xgb.train,params = params,nthread=6,nfold = 10,nrounds = 10,verbose = F)
+  #htest <- hist(mdcv$evaluation_log$test_error_mean)
+  #htrain <-hist(mdcv$evaluation_log$train_error_mean)
+  
+  xgb.pred = predict(xgb.fit, test.matrix,reshape=T)
+  xgb.pred = as.data.frame(xgb.pred)
+  head(xgb.pred, 100)
+  
+  pred.binary.test = ifelse(xgb.pred  >  0.50, 1, 0)
+  confusionMatrix(as.factor(test$y), as.factor(pred.binary.test))
+  
+  xgb.pred.train = predict(xgb.fit, train.matrix,reshape=T)
+  xgb.pred.train = as.data.frame(xgb.pred.train)
+  pred.binary.train = ifelse(xgb.pred.train  >  0.5, 1, 0)
+  
+  xgb.pred.test = predict(xgb.fit, test.matrix, reshape = T)
+  xgb.pred.test = as.data.frame(xgb.pred.test)
+  pred.binary.test = ifelse(xgb.pred.test  >  0.5, 1, 0)
+  
+  cm.train<-confusionMatrix(as.factor(train$y), as.factor(pred.binary.train))
+  cm.test<-confusionMatrix(as.factor(test$y), as.factor(pred.binary.test))
+  print(paste0("Train accuracy for ntrees = ", ntrees, " is ", cm.train$overall['Accuracy']))
+  print(paste0("Test accuracy for ntrees = ", ntrees, " is ", cm.test$overall['Accuracy']))
+}
+
+for (t in cbind(100,500,1000,5000,10000)) {
+  evaluate.xgb(t)
+}
+
+#Evaluation
+#We will use lambda = 0.005, d =  4, and trees = 1000
+
+kaggle.prep<-prepare.data(kaggle.test)
+kaggle.matrix<-as.matrix(sapply(select(kaggle.prep,-matches("ID")), as.numeric))
+all.matrix<-as.matrix(sapply(select(data.prep, -matches('^y')), as.numeric))
+label.all<-as.integer(data.prep$y)
+if (sum(label.all == 2)) {
+  label.all<-label.all-1
+}
+xgb.all.data = xgb.DMatrix(data=all.matrix, label=label.all)
+xgb.kaggle = xgb.DMatrix(data=kaggle.matrix)
+
+  opt.params = list(
+    booster="gbtree",
+    eta=0.005,
+    max_depth=4,
+    gamma=3,
+    subsample=0.75,
+    colsample_bytree=1,
+    objective="binary:logistic",
+    outputmargin=FALSE
+  )
+  
+xgb.fit.opt=xgb.train(
+    params=opt.params,
+    data=xgb.all.data,
+    nrounds=5000,
+    early_stopping_rounds=100,
+    watchlist=list(train=xgb.all.data,test=xgb.all.data),
+    verbose=0
+  )
+
+xgb.pred.alltrain<-predict(xgb.fit.opt, xgb.all.data,reshape=T)
+xgb.pred.alltrain<-as.data.frame(xgb.pred.alltrain)
+xgb.pred.alltrain.binary<-ifelse(xgb.pred.alltrain$xgb.pred.alltrain  >  0.50, 1, 0)
+cm.alltrain<-confusionMatrix(as.factor(xgb.pred.alltrain.binary), as.factor(label.all))
+print(paste0("Train accuracy for all data = is ", cm.alltrain$overall['Accuracy']))
+
+kaggle.pred<-predict(xgb.fit.opt, xgb.kaggle,reshape=T)
+kaggle.binary<-ifelse(kaggle.pred  >  0.50, 1, 0)
+kaggle.test.pred.id<-data.frame(ID=kaggle.test$ID, y=kaggle.binary)
+colnames(kaggle.test.pred.id)[2]<-'y'
+head(kaggle.test.pred.id)
+write.csv(kaggle.test.pred.id, "C://Users//khan_//Documents//MABAN//ML//Competition/XGBTry2.csv", row.names=FALSE)
+
+
+# Compare to old RF which did ok
+old.try.rf<-read.csv('C://Users//khan_//Documents//MABAN//ML//Competition/kaggleRFtry1 - Trees.csv')
+hist(as.integer(old.try.rf$y == kaggle.test.pred.id$y))
+```
+
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+

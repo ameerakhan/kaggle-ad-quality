@@ -1,0 +1,113 @@
+---
+title: " "
+output:
+  pdf_document:
+        number_sections: false
+  html_document:
+    df_print: paged
+urlcolor: blue
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries used
+```{r message=FALSE, warning=FALSE, include=FALSE}
+#ROC Plot
+library(plotROC)
+library(pROC)
+#svm 
+library(e1071)
+library(tidyverse)
+library(caret)
+```
+
+
+```{r include=FALSE}
+train.norm <- read.csv("train_transformed.csv")
+valid.norm <- read.csv("valid_transformed.csv")
+test.norm <- read.csv("test_transformed.csv")
+#removing first variable and outcome_old
+train.norm = train.norm[-c(1, 35:38)]
+valid.norm = valid.norm[-c(1, 35:38)]
+test.norm = test.norm[-c(1, 36:39)]
+```
+
+
+## SVM Radial 
+
+```{r echo=TRUE}
+set.seed(1)
+#Setting an initial value of 10 
+svmfit_radial = svm(as.factor(y) ~ ., data = train.norm[-c(10,35)], kernel = "radial", cost = 10, scale = TRUE)
+print(svmfit_radial)
+#training
+svmradial.predicted.classes <- svmfit_radial %>% predict(train.norm) #prediction error for training
+confusionMatrix(svmradial.predicted.classes, as.factor(train.norm$y), positive= '1')
+
+
+#cross validation
+# 1. CV using the caret cross validation function 
+k <- 10
+folds <- createFolds(train.norm$y, k = k)
+fitControl <- trainControl(method = "cv",
+                           number = k,
+                           index = folds)
+#Selecting the hyperparameters
+hyperpm.svm <- expand.grid(sigma = c(1e-2, 1e-1, 1),
+                           C = c(5, 25,50 ,100))
+
+
+fit.svm <- caret::train(as.factor(y)~., data= train.norm,
+                        method = "svmRadial",
+                        trControl = fitControl,
+                        tuneGrid = hyperpm.svm,
+                        metric = "Accuracy")
+#Cost C=5 gives the best accuracy 
+fit.svm
+ggplot(fit.svm)
+
+# 2. CV using the tuned.svm function 
+
+svm_tuned= tune.svm(as.factor(y)~., data = train.norm, gamma = 0.01, cost = 10^2, kernel="radial", tunecontrol=tune.control(cross=10))
+#error rate
+
+summary(svm_tuned)
+#performance of tuned model
+svm_tuned$performances
+#choosing the optimal model
+svmfit_tuned  = svm_tuned$best.model
+
+#validation
+#Not significant difference in CV of both methods
+#Predicting on the validation set (10% of training)
+svm_radial.pred.valid <-  svmfit_tuned %>% predict(valid.norm) #prediction error for training
+cm.svm_radial.valid <- confusionMatrix(svm_radial.pred.valid  , as.factor(valid.norm$y), positive= '1')
+cm.svm_radial.valid
+svmradial.valid.res <- as.data.frame(cbind(as.numeric(as.character(svm_radial.pred.valid )), valid.norm$y))
+colnames(svmradial.valid.res) <- c("predicted", "actual")
+svm_radial.roc <- ggplot(svmradial.valid.res, aes(d=actual, m=predicted))+ geom_roc(labels=FALSE)+style_roc() +ggtitle("Validation Set ROC for SVM (Radial)") + geom_roc(n.cuts=20,labels=FALSE) + style_roc(theme = theme_grey) + geom_rocci(fill="pink") 
+svm_radial.roc
+
+
+
+#Prediciting on the test set given to us
+test.norm$y <-svmfit_tuned  %>% predict(test.norm)
+svm_radial.res<- as.data.frame(cbind(test.norm$ID, as.numeric(as.character(test.norm$y))))
+res_names <- c("ID","y")
+colnames(svm_radial.res)<- res_names
+head(svm_radial.res)
+y_test<- fit.svm%>% predict(test.norm[,-1])
+y_test.pred.id<-data.frame(ID=test.norm$ID, y=y_test)
+colnames(y_test.pred.id)[2]<-'y'
+head(y_test.pred.id)
+
+#write.csv(y_test.pred.id, "Keras_NNet.csv", row.names=FALSE)
+#comparing test set predicitons with Random Forest, it can be seen that this model will not improve the accuracy on the leader board. 
+old.try.rf<-read.csv('kaggleRFtry1.csv')
+hist(as.integer(old.try.rf$y == y_test.pred.id$y))
+#write.csv(svm_radial.res, "SVMRadial2.csv")
+```
+
+
+

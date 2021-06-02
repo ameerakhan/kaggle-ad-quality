@@ -1,0 +1,39 @@
+---
+title: "Kaggle Competition Stepwise Regression"
+author: "Ameera KHAN"
+date: "4/28/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+setwd("C://Users//khan_//Documents//MABAN//ML//Competition")
+data <- read.csv("train_transformed.csv")
+data <- data[-c(1)]
+library(olsrr)
+library(MASS)
+library(formattable)
+#stepwise regression
+initial.reg <- lm(y ~., data=data)
+step_reg  <- ols_step_forward_p(initial.reg)
+fit_lmstep <- step(initial.reg)
+names()
+
+#using these coefficients to create a new dataframe
+# d2 <- subset( news.reg.df, select = vars_names[-1])
+# new_data <- cbind(cleaned.news.df$popularity, news.reg.df$shares, d2)
+# names(new_data)[names(new_data) == "cleaned.news.df$popularity"] <- "popularity"
+# #saving newdataset and adding the shares and popularity variables
+# write.csv(new_data,'cleaned_data_2.csv')
+# dim(new_data)
+```
+
+
+```{r}
+formattable(fit_lmstep$coefficients)
+
+```
+

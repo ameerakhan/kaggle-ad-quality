@@ -1,0 +1,535 @@
+---
+title: "Feature Engineering"
+author: "Ameera KHAN"
+date: "4/26/2020"
+output:
+  pdf_document:
+        number_sections: false
+  html_document:
+    df_print: paged
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+# import knitr (super important!!!)
+library(knitr)
+library(tinytex)
+library(gridExtra)
+library(DataExplorer)
+# import kableExtra (to print nice tables)
+library(kableExtra)
+
+# set global options (can be modified locally)
+knitr::opts_chunk$set(
+	fig.align = "center",
+	fig.show = "hold",
+	message = FALSE,
+	warning = FALSE,
+	cache = TRUE,
+	out.width = "75%"
+)
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, include=FALSE}
+setwd("C://Users//khan_//Documents//MABAN//ML//Competition")
+train.df <- read.csv("train.csv")
+test.df <- read.csv("test.csv")
+#data exploration
+library(DataExplorer)
+library(ggplot2)
+library(magrittr)
+library(reshape)
+library(devtools)
+library(formattable)
+library(fastDummies)
+library(caret)
+library(cowplot)
+library(car)
+library(rcompanion)
+library(ggbiplot)
+#xgboost
+library(xgboost)
+library(readr)
+library(stringr)
+library(dplyr)
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, include=FALSE}
+# Loading Graphs Required 
+ box1 <- qplot(as.factor(y), age, data = train.df, 
+      geom=c("boxplot"), fill = as.factor(y))+  xlab("Conversion") +ylab("Age") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+ box2 <-qplot(as.factor(y), banner_views, data = train.df, 
+      geom=c("boxplot"), fill = as.factor(y))+  xlab("Conversion") +ylab("Banner Views") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+ box3 <- qplot(as.factor(y), banner_views_old, data = train.df, 
+      geom=c("boxplot"), fill = as.factor(y))+  xlab("Conversion") +ylab("Banner Views Old") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+   box4 <- qplot(as.factor(y), day, data = train.df, 
+      geom=c("boxplot"), fill = as.factor(y))+  xlab("Conversion") +ylab("Day") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+ box5 <- qplot(as.factor(y), days_elapsed_old, data = train.df, 
+      geom=c("boxplot"), fill = as.factor(y))+  xlab("Conversion") +ylab("Days Elapsed Old") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+ box6 <- qplot(as.factor(y), month, data = train.df, 
+      geom=c("boxplot"), fill = as.factor(y))+  xlab("Conversion") +ylab("Month") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+ box7 <-qplot(as.factor(y), time_spent, data = train.df, 
+      geom=c("boxplot"), fill = as.factor(y))+  xlab("Conversion") +ylab("Time Spent") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+ box8 <- qplot(as.factor(y), X4, data = train.df, 
+      geom=c("boxplot"), fill = as.factor(y))+  xlab("Conversion") +ylab("X4") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+```
+
+<b> Treatment of NA's <b>
+
+Many categorical predictors such as 'job' and 'marital status' contain the value of 'na'. THis can be overcome by converting this 'na' value to 'other' since removing such observations from the dataset may increase the bias of the models implemented. By doing so, the five categorical variables of:
+
+* Job
+* Marital 
+* Education
+* Device
+* Outcome Old 
+are converted into binary variables and ithus increasing the dimensionality of the data. 
+```{r echo=TRUE,include=FALSE}
+# Converting Demographical Dummies 
+demo.df <- train.df[,c(1:4,17)]
+#2.     Education is a factor variable and needs to be converted to a binary variable to function with         algorithms. In addition to this, "na" will then be superflous and can be removed (if all               dummies of education are 0, then it automatically means "na")
+
+#2.a    Dummies for training set
+educdummies <-  dummy_cols(demo.df$education)
+educ_cols <- c("name","educ_grad_school", "educ_high_school", "educ_other","educ_university")
+colnames(educdummies) <- educ_cols
+educdummies<- educdummies[ -c(1) ]
+train.df<- cbind(train.df, educdummies)
+#2.b    Dummies for test set
+educdummies2 <-  dummy_cols(test.df$education)
+colnames(educdummies2) <- educ_cols
+educdummies2<- educdummies2[ -c(1) ]
+test.df<- cbind(test.df, educdummies2)
+
+#3.     Similarly, dummy variabkes need to be made for "marital" variable for training and test 
+#3a.    Training set 
+mardummies <-  dummy_cols(demo.df$marital)
+mar_cols <- c("name", "mar_divorced","mar_married", "mar_single")
+colnames(mardummies) <- mar_cols
+mardummies<- mardummies[ -c(1) ]
+train.df<- cbind(train.df, mardummies)
+#3b.    Test Set
+mardummies2 <-  dummy_cols(test.df$marital)
+colnames(mardummies2) <- mar_cols
+mardummies2<- mardummies2[ -c(1) ]
+test.df<- cbind(test.df, mardummies2)
+
+#4.     By the same token, "job" will be created into a variable
+#4.a    Training set
+jobdummies <-  dummy_cols(demo.df$job)
+job_cols <- c("name","job_entrepreneur","job_freelance", "job_housekeeper","job_industrial_worker", "job_manager", "job_other","job_retired","job_salesman", "job_student","job_teacher","job_technology","job_unemployed")
+colnames(jobdummies) <- job_cols
+jobdummies<- jobdummies[ -c(1) ] #removing na for being superflous
+train.df<- cbind(train.df, jobdummies)
+#4b.    Test Set
+jobdummies2 <-  dummy_cols(test.df$job)
+colnames(jobdummies2) <- job_cols
+jobdummies2<- jobdummies2[ -c(1) ] #removing na for being superflous
+test.df<- cbind(test.df, jobdummies2)
+
+
+# Converting Outcome_Old 
+
+use.df <- train.df[,c(5:12,17)]
+#1.     The device variable needs to be transformed into a dummy to become functional 
+#1.a    Training set
+devicedummies <-  dummy_cols(train.df$device)
+device_cols <- c("name", "device_desktop", "device_other", "device_smartphone")
+colnames(devicedummies) <- device_cols
+devicedummies<- devicedummies[ -c(1) ] #removing na for being superflous
+train.df<- cbind(train.df, devicedummies)
+#1b.    Test Set
+devicedummies2 <-  dummy_cols(test.df$device)
+colnames(devicedummies2) <- device_cols
+devicedummies2<- devicedummies2[ -c(1) ] #removing na for being superflous
+test.df<- cbind(test.df, devicedummies2)
+#3.     Dummies for old outcome. Herem "na" is not superflous therefore we keep it and remove "other"
+#3.a    Training Set 
+olddummies <-  dummy_cols(train.df$outcome_old)
+old_cols <- c("name", "old_outcome_failure", "old_outcome_na", "old_outcome_other","old_outcome_success")
+colnames(olddummies) <- old_cols
+olddummies<- olddummies[ -c(1) ] #removing other for being superflous
+train.df<- cbind(train.df, olddummies)
+#3.b    Test Set 
+olddummies2 <-  dummy_cols(test.df$outcome_old)
+colnames(olddummies2) <- old_cols
+olddummies2<- olddummies2[ -c(1) ] #removing other for being superflous
+test.df<- cbind(test.df, olddummies2)
+
+
+# Removing Original Categorical Variables 
+train.df <- train.df[-c(2,3,4,5,12)]
+test.df <- test.df[-c(3,4,5,6,13)]
+```
+
+## 2. Treatment of Outliers
+
+The box plots below show that there are many outlier values present in the numerical predictors such as 'banner_views', 'banner_views_old', 'days_elapsed_old', 'time_spent' and 'X4'.
+
+```{r echo=TRUE}
+#Boxplots of numerical Predictors 
+grid1 <- plot_grid(box1, box2, box3,box4)
+grid1
+grid2 <- plot_grid(box5, box6, box7,box8)
+grid2
+
+```
+In order to understand the impact of these outliers, it is intuitive to compute the "Cook's Distance" for the predictors which can be formulated as:
+
+<insert Cook's formula>
+
+where .... The graphs below shows that there are many outliers (above the cook's distance cutoff line in red) that influence the response 'y'. When such values are extracted, the exact number of outliers are 346, which accounts for 4% of training data. In addition to this, the function "outlier test" from the 'car' package suggests that the observation in row 4899 is the most extreme value present in the data set. 
+
+
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+cook.lm <- lm( y~. , data=train.df)
+cooksd <- cooks.distance(cook.lm )
+plot(cooksd, pch="*", cex=2, main="Influential Observations by Cooks distance")  # plot cook's distance
+abline(h = 4*mean(cooksd, na.rm=T), col="red")  # add cutoff line
+influential <- (as.numeric(names(cooksd)[(cooksd > 4*mean(cooksd, na.rm=T))]))
+#performing outlier test
+car::outlierTest(cook.lm)
+options(scipen=999)
+#observation with the most extreme value
+train.df[4899,]
+                      
+```
+One method to overcome such a problem is to impute new values for the outliers. A common imputation is to replace outlier values with a cap of 1.5 of the 'Inter-quartile Range' of the given predictor. This interquartile range can be computed as: 
+
+<Insert formula for interquartile range>
+
+The following figure shows how the treatment of outliers has changed the distribution of the given predictors. The effects of the treatment can be summarised as follows:
+
+* Age: The treatment has led to dampening of outliers, therefore, it can be proved beneficial for the analysis. 
+* Banner Views: The treatment has significantly reduced outliers in the data. 
+* Banner Views Old: This transformation may not be beneficial for the data, given that all values have been reduced to zero. 
+* Day: There is no effect on the outliers for this predictor. 
+* Days Elapsed Old: The effect of the treatment has led the values to be reduced to zero which may cause difficulties in the analysis. 
+* Month: There is no effect of the treatment on the this predictor. 
+* Time spent: Outliers seem to have decreased although further transformation may be required to improve the distribution. 
+* X4: Outliers seem to have decreased although further transformation may be required to improve the distribution. 
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+#Creating formula for imputing outlier value 
+outlier_treatment <-  function(x) {
+ x[x < quantile(x,0.25) - 1.5 * IQR(x) | x > quantile(x,0.75) + 1.5 * IQR(x)] <- median(x)
+ x
+}
+
+#applying the formula to all the numerical predictors 
+treated_outliers <- as.data.frame(lapply(train.df[c(1:7,11)], outlier_treatment))
+treated_outliers <- cbind(treated_outliers, train.df$y)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#comparing old and new predictors 
+
+ box9 <- qplot(as.factor(train.df$y), age, data = treated_outliers, 
+      geom=c("boxplot"), fill = as.factor(train.df$y))+  xlab("Conversion") +ylab("Age") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+ 
+ box10 <- qplot(as.factor(train.df$y), day, data = treated_outliers, 
+      geom=c("boxplot"), fill = as.factor(train.df$y))+  xlab("Conversion") +ylab("Day") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+ 
+  box11 <- qplot(as.factor(train.df$y), month, data = treated_outliers, 
+      geom=c("boxplot"), fill = as.factor(train.df$y))+  xlab("Conversion") +ylab("Month") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+  
+   box12 <- qplot(as.factor(train.df$y), time_spent, data = treated_outliers, 
+      geom=c("boxplot"), fill = as.factor(train.df$y))+  xlab("Conversion") +ylab("Time Spent") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+   
+    box13 <- qplot(as.factor(train.df$y), banner_views, data = treated_outliers, 
+      geom=c("boxplot"), fill = as.factor(train.df$y))+  xlab("Conversion") +ylab("Banner Views") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+    
+     box14 <- qplot(as.factor(train.df$y), banner_views_old, data = treated_outliers, 
+      geom=c("boxplot"), fill = as.factor(train.df$y))+  xlab("Conversion") +ylab("Banner Views Old") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+     
+      box15 <- qplot(as.factor(train.df$y), X4, data = treated_outliers, 
+      geom=c("boxplot"), fill = as.factor(train.df$y))+  xlab("Conversion") +ylab("X4") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+          
+      box16 <- qplot(as.factor(train.df$y),days_elapsed_old, data = treated_outliers, 
+      geom=c("boxplot"), fill = as.factor(train.df$y))+  xlab("Conversion") +ylab("Days Elapsed Old") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+#comparing the box plots
+#Age 
+grid3 <- plot_grid(box1,box9, labels = "AUTO")
+grid3
+#Banner Views
+grid4 <- plot_grid(box2,box13, labels = "AUTO")
+grid4
+#Banner Views Old 
+grid5 <- plot_grid(box3,box14, labels = "AUTO")
+grid5
+#Day 
+grid6 <- plot_grid(box4,box10, labels = "AUTO")
+grid6
+#Day Elapsed Old
+grid7 <- plot_grid(box5,box16, labels = "AUTO")
+grid7
+#Month
+grid8 <- plot_grid(box6,box11, labels = "AUTO")
+grid8
+#Time Spent 
+grid9 <- plot_grid(box7,box12, labels = "AUTO")
+grid9
+#X4
+grid10 <- plot_grid(box8,box15, labels = "AUTO")
+grid10
+```
+
+## 3. Treatment of Skewed Data
+
+Even with dampening the effect of outliers, the graph below shows that the distribution of the numerical data are not normal. Predictors such as age and time spent are positively skewed, whereas banner_views exhibits an exponential decay. A logarithmic tranformation can aid in normalizing the distribution of the given predictors. The density plots show that after treatment of the outliers, the predictors 'age', 'X4' and 'time_spent' exhibit a bell shape, indicating that the transformation was successful for these variables. However, to treat the skewed nature of the rest of the numerical prodictors, scaling is required. 
+
+```{r echo=TRUE}
+#1. Log Transformation on treated variables 
+treated_outliers$log_age <- log(treated_outliers$age +1) #works
+treated_outliers$log_time_spent <- log(treated_outliers$time_spent +1)#works
+treated_outliers$log_X4 <- log(treated_outliers$X4 +1) #works
+treated_outliers$log_day <- log(treated_outliers$day +1)
+treated_outliers$log_month <- log(treated_outliers$month +1)
+plot_density(treated_outliers)
+
+```
+
+## 4. Standardisation of Numerical Variables
+
+
+```{r echo= TRUE, include=FALSE}
+#To check if the transformations have any effect individually and collectively, I'm constructing 3 different data sets. 
+set.seed(1)
+
+#1. Data set with no transformations 
+train.index <- sample(row.names(train.df), 0.9*dim(train.df))
+train_original<- train.df[train.index, ]
+valid.index <- setdiff(row.names(train.df), train.index) #10% of training set
+valid_original <-train.df[valid.index,]
+
+# Normalising using center and scale 
+#preprocessing training set
+trainprepoc <- preProcess(train_original[c(1,2,3,4,5,6,7,11)], method=c("range"))
+train_original_norm <- predict(trainprepoc,train_original[c(1,2,3,4,5,6,7,11)])
+train_original_norm <- cbind(train_original_norm, train_original[c(8:10,13:38,12)])
+#write.csv(train.norm,"train_original.csv")
+#preprocessing validaton set
+valid_original_norm <- predict(trainprepoc,valid_original[c(1,2,3,4,5,6,7,11)])
+valid_original_norm<- cbind(valid_original_norm , valid_original[c(8:10,13:38,12)])
+#write.csv(valid.norm, "valid_norm.csv")
+#preprocessing test set
+test_original_norm <- predict(trainprepoc,test.df[c(2,3,4,5,6,7,8,12)])
+test_original_norm<- cbind(test.df[c(1)],test_original_norm, test.df[c(9:11,13:38)])
+#write.csv(test.norm, "test_original.csv")
+
+
+
+#2. Dataset with outlier treatment
+train.df$age <-treated_outliers$age
+train.df$banner_views <- treated_outliers$banner_views
+train.df$time_spent <- treated_outliers$time_spent
+train.df$X4 <- treated_outliers$X4
+
+#Performing the same on the test set
+test_treated <-  as.data.frame(lapply(test.df[c(2,5,6,12)], outlier_treatment))
+test.df$age <- test_treated$age
+test.df$banner_views <- test_treated$banner_views
+test.df$time_spent <- test_treated$time_spent
+test.df$X4 <- test_treated$X4
+
+#Normalising 
+train_treated<- train.df[train.index, ]
+valid_treated <-train.df[valid.index,]
+#preprocessing training set
+trainprepoc <- preProcess(train_treated[c(1,2,3,4,5,6,7,11)], method=c("range"))
+train_treated_norm <- predict(trainprepoc,train_treated[c(1,2,3,4,5,6,7,11)])
+train_treated_norm <- cbind(train_treated_norm, train_original[c(8:10,13:38,12)])
+#write.csv(train.norm,"train_treated.csv")
+#preprocessing validaton set
+valid_treated_norm <- predict(trainprepoc,valid_treated[c(1,2,3,4,5,6,7,11)])
+valid_treated_norm<- cbind(valid_treated_norm, valid_original[c(8:10,13:38,12)])
+#write.csv(valid.norm, "valid_treated.csv")
+#preprocessing test set
+test_treated_norm <- predict(trainprepoc,test.df[c(2,3,4,5,6,7,8,12)])
+test_treated_norm<- cbind(test.df[c(1)],test_treated_norm, test.df[c(9:11,13:38)])
+#write.csv(test.norm, "test_treated.csv")
+
+
+
+#3. Treatment with transformations 
+train.df$age <-treated_outliers$log_age
+train.df$time_spent <- treated_outliers$log_time_spent
+train.df$X4 <- treated_outliers$log_X4
+
+#Performing the same on the test set
+test.df$age <- log(test_treated$age+1)
+test.df$time_spent <- log(test_treated$time_spent+1)
+test.df$X4 <- log(test_treated$X4+1)
+#Normalising 
+train_transformed<- train.df[train.index, ]
+valid_transformed <-train.df[valid.index,]
+#preprocessing training set
+trainprepoc <- preProcess(train_transformed[c(1,2,3,4,5,6,7,11)], method=c("range"))
+train_transformed_norm <- predict(trainprepoc,train_transformed[c(1,2,3,4,5,6,7,11)])
+train_transformed_norm <- cbind(train_transformed_norm, train_original[c(8:10,13:38,12)])
+write.csv(train_transformed_norm ,"train_transformed.csv")
+#preprocessing validaton set
+valid_transfomed_norm <- predict(trainprepoc,valid_transformed[c(1,2,3,4,5,6,7,11)])
+valid_transfomed_norm<- cbind(valid_transfomed_norm, valid_original[c(8:10,13:38,12)])
+write.csv(valid_transfomed_norm, "valid_transformed.csv")
+#preprocessing test set
+test_transformed_norm <- predict(trainprepoc,test.df[c(2,3,4,5,6,7,8,12)])
+test_transformed_norm<- cbind(test.df[c(1)],test_transformed_norm, test.df[c(9:11,13:38)])
+write.csv(test_transformed_norm, "test_transformed.csv")
+
+write.csv(test.df, "test_new.csv")
+write.csv(train.df, "test_new.csv")
+```
+
+
+## 5. Principle Component Analysis
+
+Principle Component Analysis is an intuitive method to understand the underlying variation in the data. However, in this context shows little applicability. For example, the first few principle components exhibit little variation, which can be seen from the graphs. This situation also extends to the treated and transformed data sets where the variation explained by the first two components is almost similar. 
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+#1. Original Data 
+## Removing categorical variables and the response
+original_pca_data <- train_original_norm[-c(9:38)]
+pca_original <-  prcomp(original_pca_data, scale. = F, center. = F)
+#Evaluating
+std_dev <- pca_original$sdev
+pr_var <- std_dev^2
+prop_varex <- pr_var/sum(pr_var)
+plot(prop_varex, xlab = "Principal Components for Original Data",
+             ylab = "Proportion of Variance Explained",
+             type = "b")
+ggbiplot(pca_original ,ellipse=TRUE, circle=TRUE,obs.scale =12 , var.scale = -8,var.axes=TRUE, alpha=0, groups=as.factor(train_transformed_norm$y)) +
+  ggtitle("Principal Components for Original Data")+
+  theme_minimal()+
+  theme(legend.position = "bottom")
+#2. Treated data 
+## Removing categorical variables and the response
+treated_pca_data <- train_treated_norm[-c(9:38)]
+pca_treated <-  prcomp(treated_pca_data , scale. = F, center.= F)
+#pca_treated $rotation
+#Evaluating
+std_dev <- pca_treated$sdev
+pr_var <- std_dev^2
+prop_varex <- pr_var/sum(pr_var)
+plot(prop_varex, xlab = "Principal Components for Treated Data",
+             ylab = "Proportion of Variance Explained",
+             type = "b")
+ggbiplot(pca_treated ,ellipse=TRUE, circle=TRUE,obs.scale =3 , var.scale =-8,var.axes=TRUE, alpha=0, groups=as.factor(train_transformed_norm$y)) +
+  ggtitle("Principal Components for Treated Data")+
+  theme_minimal()+
+  theme(legend.position = "bottom")
+
+#3. Transformed Data 
+transformed_pca_data <- train_transformed_norm[-c(9:38)]
+pca_transformed <-  prcomp(transformed_pca_data , scale. = F, center.= F)
+#pca_transformed $rotation
+
+#Evaluating
+std_dev <- pca_transformed$sdev
+pr_var <- std_dev^2
+prop_varex <- pr_var/sum(pr_var)
+plot(prop_varex, xlab = "Principal Components for Transformed Data",
+             ylab = "Proportion of Variance Explained",
+             type = "b")
+ggbiplot(pca_transformed,ellipse=TRUE, circle=TRUE,obs.scale =-2 , var.scale = -6,var.axes=TRUE, alpha=0, groups=as.factor(train_transformed_norm$y)) +
+  ggtitle("Principal Components for Transformed Data")+
+  theme_minimal()+
+  theme(legend.position = "bottom")
+
+```
+
+## 6. Effect of Feature Engineering on Accuracy
+
+In order to understand whether the feature engineering has made any underlying difference to the data, it will be evaluated using the best performing algorithm in this analysis, which is the boosted trees algorithm. 
+
+
+```{r echo=TRUE}
+# # XGBoost with transformed data
+# #Removing old outcome 
+# train.df <- train.df[-C(35:38)]
+# test.df <- test.df[-C(35:38)]
+# 
+# set.seed(1)
+# train.index<-sample(dim(train.df)[1], 0.6*dim(train.df[1]))
+# train<-train.df[train.index, ]
+# test<-train.df[-train.index, ]
+# attach(train)
+# 
+# train.matrix<-as.matrix(sapply(train[,-c(grep('y', colnames(train)))], as.numeric))
+# test.matrix<-as.matrix(sapply(test[,-c(grep('y', colnames(test)))], as.numeric))
+# 
+# label.train<-as.integer(train$y)
+# label.test<-as.integer(test$y)
+# if (sum(label.train == 2)) {
+#   label.train<-label.train-1
+# }
+# if (sum(label.test == 2)) {
+#   label.test<-label.test-1
+# }
+# xgb.train = xgb.DMatrix(data=train.matrix, label=label.train)
+# xgb.test = xgb.DMatrix(data=test.matrix, label=label.test)
+# 
+# evaluate.xgb<-function(ntrees) {
+#   # Define the parameters for  classification
+#   params = list(
+#     booster="gbtree",
+#     eta=0.005,
+#     max_depth=4,
+#     gamma=3,
+#     subsample=0.75,
+#     colsample_bytree=1,
+#     objective="binary:logistic",
+#     outputmargin=FALSE
+#   )
+#   
+#   # Train the XGBoost classifer
+#   xgb.fit=xgb.train(
+#     params=params,
+#     data=xgb.train,
+#     nrounds=ntrees,
+#     early_stopping_rounds=ntrees*0.1,
+#     watchlist=list(train=xgb.train,test=xgb.test),
+#     verbose=0
+#   )
+#   
+#   #Cross validation
+#   mdcv <-xgb.cv(data=xgb.train,params = params,nthread=6,nfold = 10,nrounds = 10,verbose = F)
+#   htest <- hist(mdcv$evaluation_log$test_error_mean)
+#   htrain <-hist(mdcv$evaluation_log$train_error_mean)
+# 
+#   xgb.pred = predict(xgb.fit, test.matrix,reshape=T)
+#   xgb.pred = as.data.frame(xgb.pred)
+#   head(xgb.pred, 100)
+#   
+#   pred.binary.test = ifelse(xgb.pred  >  0.50, 1, 0)
+#   confusionMatrix(as.factor(test$y), as.factor(pred.binary.test))
+#   
+#   xgb.pred.train = predict(xgb.fit, train.matrix,reshape=T)
+#   xgb.pred.train = as.data.frame(xgb.pred.train)
+#   pred.binary.train = ifelse(xgb.pred.train  >  0.5, 1, 0)
+#   
+#   xgb.pred.test = predict(xgb.fit, test.matrix, reshape = T)
+#   xgb.pred.test = as.data.frame(xgb.pred.test)
+#   pred.binary.test = ifelse(xgb.pred.test  >  0.5, 1, 0)
+#   
+#   cm.train<-confusionMatrix(as.factor(train$y), as.factor(pred.binary.train))
+#   cm.test<-confusionMatrix(as.factor(test$y), as.factor(pred.binary.test))
+#   print(paste0("Train accuracy for ntrees = ", ntrees, " is ", cm.train$overall['Accuracy']))
+#   print(paste0("Test accuracy for ntrees = ", ntrees, " is ", cm.test$overall['Accuracy']))
+# }
+# 
+# for (t in cbind(100,500,1000,1500,2500, 4000, 5000,7500, 10000)) {
+#   evaluate.xgb(t)
+# }
+
+```

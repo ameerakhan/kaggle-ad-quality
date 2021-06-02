@@ -1,0 +1,138 @@
+---
+title: "Data Visualization"
+output:
+  pdf_document:
+        number_sections: false
+  html_document:
+    df_print: paged
+urlcolor: blue
+---
+```{r echo=TRUE, warning=FALSE, message=FALSE, include=FALSE}
+
+####### APPENDIX OF DATA VISUALIZATION ########
+
+setwd("C://Users//khan_//Documents//MABAN//ML//Competition")
+train.df <- read.csv("train.csv")
+#data exploration
+library(DataExplorer)
+library(ggplot2)
+library(magrittr)
+library(reshape)
+library(devtools)
+library(formattable)
+library(fastDummies)
+library(caret)
+#ROC Plot
+library(plotROC)
+library(pROC)
+#KNN
+library(caret)
+library(tidyverse)
+library(formattable)
+#svm 
+library(e1071)
+
+#Demographic Plots
+demo.df <- train.df[,c(1:4,17)]
+
+age.plot<- qplot(as.factor(y), age, data = demo.df, 
+      geom=c("boxplot"), fill = as.factor(y))+  xlab("Conversion") +ylab("Age") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+job.plot<- ggplot(data=demo.df, aes(x=job, fill=as.factor(y))) +
+geom_bar(position="fill") + theme(axis.text.x = element_text(angle = 90)) +  xlab("Type of Job") +ylab("Frequency") +  scale_x_discrete(limits=c("student", "retired", "unemployed", "manager", "freelance", "teacher", "technology","na", "salesman", "housekeeper","industrial_worker")) + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+marital.plot <-  ggplot(data=demo.df, aes(x=marital, fill=as.factor(y))) +
+geom_bar(position="fill") + theme(axis.text.x = element_text(angle = 90)) +  xlab("Marital Status") +ylab("Frequency") + scale_x_discrete(limits=c("single","divorced", "married"))  + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+educ.plot <-ggplot(data=demo.df, aes(x=education, fill=as.factor(y))) +
+geom_bar(position="fill") + theme(axis.text.x = element_text(angle = 90)) +  xlab("Level of Education") +ylab("Frequency") + scale_x_discrete(limits=c("grad_school", "na", "university","high_school")) + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+#Usage Plots
+use.df <- train.df[,c(5:12,17)]
+device.plot<- ggplot(data=use.df, aes(x=device, fill=as.factor(y))) +
+geom_bar(position="fill") + theme(axis.text.x = element_text(angle = 90)) +  xlab("Type of Device") +ylab("Frequency")  +  scale_x_discrete(limits=c("smartphone","desktop", "na")) + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+time_spent.plot<- qplot(as.factor(y), time_spent, data = use.df, 
+      geom=c("boxplot"), fill = as.factor(y))+  xlab("Conversion") +ylab("Time Spent (Seconds)") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+old.plot<- ggplot(data=use.df, aes(x=outcome_old,  fill=as.factor(y))) +
+geom_bar(position="fill") + theme(axis.text.x = element_text(angle = 90)) +  xlab("Old Outcome") +ylab("Frequency")  + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted")) + scale_x_discrete(limits=c("success","other","failure", "na")) 
+
+#Other variable Plots
+other.df<- train.df[(c(13:17))]
+
+X1.plot<- ggplot(data=other.df, aes(x=as.factor(X1), fill=as.factor(y))) +
+geom_bar(position="fill") + theme(axis.text.x = element_text(angle = 90)) +  xlab("X1") +ylab("Frequency") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+X2.plot<- ggplot(data=other.df, aes(x=as.factor(X2), fill=as.factor(y))) +
+geom_bar(sposition="fill") + theme(axis.text.x = element_text(angle = 90)) +  xlab("X2") +ylab("Frequency") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+X3.plot<- ggplot(data=other.df, aes(x=as.factor(X3),  fill=as.factor(y))) +
+geom_bar(position="fill") + theme(axis.text.x = element_text(angle = 90)) +  xlab("X3") +ylab("Frequency") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+X4.plot<- qplot(as.factor(y), X4, data = other.df, 
+      geom=c("boxplot"), fill = as.factor(y))+  xlab("Conversion") +ylab("X4") + scale_fill_discrete(name = "Key", labels = c("Not Converted", "Converted"))
+
+```
+
+
+
+```{r setup, include=FALSE}
+# import knitr (super important!!!)
+library(knitr)
+library(tinytex)
+library(gridExtra)
+library(DataExplorer)
+# import kableExtra (to print nice tables)
+library(kableExtra)
+
+# set global options (can be modified locally)
+knitr::opts_chunk$set(
+	fig.align = "center",
+	fig.show = "hold",
+	message = FALSE,
+	warning = FALSE,
+	cache = TRUE,
+	out.width = "75%"
+)
+```
+
+
+The visualised data shows how a customers' decision to convert varies with their own characteristics. For example, in terms of device usage, Figure \ref{fig:figure1} shows a high conversion rate for customers with smartphones than with desktop and other devices. 
+```{r figure1, echo=FALSE, fig.cap="Bar Plot of Devices with respect to Conversion", fig.pos="H", fig.height=4, fig.width=4}
+device.plot
+```
+In addition to this, Figure \ref{fig:figure2} depicts the highest conversion for those with a university level of education, although the figures suggest that the relatively larger proportion of conversions are occuring for those customers with a post graduate level of education as well as those with non-traditional levels of education. 
+```{r figure2, echo=FALSE, fig.cap="Bar Plot of Devices with respect to Conversion", fig.pos="H", fig.height=4, fig.width=4}
+educ.plot
+```
+
+Moreover, the conversion rates are higher for those with the job titles of "manager", "retired" and "student" than the rest of the job occupations in the study, showing that these customers could be segmented as possible 'converts' Figure \ref{fig:figure3}. 
+```{r figure3, echo=FALSE, fig.cap="Bar Plot of Job Titles with respect to Conversion", fig.pos="H", fig.height=4, fig.width=4}
+job.plot
+```
+
+The data also suggest that the old campaign may have been inadequate. The bar chart in Figure  \ref{fig:figure4} indicates that there are many unclassified outcomes 'na' which can potentially pose as a source of uncertainty in the data. 
+```{r figure4, echo=FALSE, fig.cap="Bar Plot of Old Outcomes with respect to Conversion", fig.pos="H", fig.height=4, fig.width=4}
+old.plot
+```
+
+
+In addition to this, the data set is prone to an array of irregularities. Firstly, Figure  \ref{fig:figure5} shows that the age predictor has many customers of an older age are present in the database in comparison to the interquartile range of 25 to 45 years. 
+```{r figure5, echo=FALSE, fig.cap="Box Plot of Age respect to Conversion", fig.pos="H", fig.height=4, fig.width=4}
+age.plot
+```
+
+Secondly, the unknown predictors X1 and X2 are unbalanced with more customers exhibiting the absence of the particular characteristics (See Figure \ref{fig:figure6}) . The box-plot of X4 predictor also exhibits many outliers for both converters and non-converters. 
+```{r figure6, echo=FALSE, fig.cap="Visualizations of Unknown Parameters", fig.pos="H", fig.height=4, fig.width=4}
+X1.plot
+X2.plot
+X4.plot
+```
+
+In addition to this, the numerical predictors have also been examined through density plot, the results of which show that variables such as banner_views, banner_views_old, days_elapsed_old, time_spent and X4 are positively skewed. Such distributions can cause bias in the modelling so a logarithmic transformatio has been applied to these variables to balance the data set. 
+
+```{r}
+plot_density(train.df)
+```
+
+

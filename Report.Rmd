@@ -1,0 +1,470 @@
+---
+title: "Final Report"
+author: "Ameera Khan,Yelizaveta Godovanyuk, and Emily Sharata"
+date: "May 24, 2020"
+output:
+  pdf_document:
+    fig_caption: yes
+    number_sections: yes
+  word_document: default
+header-includes: \usepackage{amsmath}
+geometry: margin=2.5cm
+subtitle: Covid Masters
+documentclass: article
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(png)
+
+# import kableExtra (to print nice tables)
+library(kableExtra)
+
+# set global options (can be modified locally)
+knitr::opts_chunk$set(warning=FALSE, message=FALSE, cache=TRUE, fig.show = 'hold', fig.lp="fig:", 
+                      fig.align = 'center', out.width = "75%")
+
+# Note that label should ALWAYS come  after caption in figures
+
+```
+\section{Introduction}
+
+For this Kaggle competition we were presented with a data set provided by a tech company desiring to understand the quality of their online ad campaigns. The quality of the campaigns is quantified by the number of users who click on their banner ads. Therefore, in this competition we were faced with a binary classification problem, since the company desires to predict when a user will click on the ad or not. The company collected data from their users using 16 different numeric and categorical features. In the training set provided, we were given $n = 8526$ records which accounts for approximately 10% of the total data set. With this training data we performed an exploratory data analysis to gain a better understanding of the full data set. There are $n = 8526$ $(x_i,y_i)$ records, where $x_i\in \mathbb R^p$ and $p$ = 16, and $y_i \in \{0,1\}$.
+
+We then implemented several machine learning algorithms in an attempt to establish a baseline understanding of their predictive powers. These methods were k-nearest neighbors, logistic regression, support vector machines, neural nets, and tree-based algorithms. In all of these models we assume that the data follows a Bernoulli distribution $B$ of $(X,Y)$ where $Y \sim  B(X) \in \{0,1\}$. Given that we have a binary classification problem, we used the 0-1 loss function to measure the misclassification error, given by:
+
+
+\begin{equation}
+L(y,\hat{y}) = 1\{ y \ne \hat{y}\}  =  
+  \begin{cases}
+    0, & \text{if}\,\, y = \hat{y}\\ 
+    1  & \text{if}\,\, y \ne \hat{y}
+  \end{cases}
+  \label{losseq}
+\end{equation}
+
+We aim to find a classifier such that $G \{x_1,...x_p\} = \{0,1\}$, where $x_1,...x_p$ are the predictors and the success probabililty being $P_x = P (Y=1 | X=x)$.
+
+After implementing these different methods in the first half of the competition, we decided to focus on those which gave us the best performance: neural nets, gradient boosted decision trees, and random forests. In the end, we produced an ensemble method with these three models in an attempt to achieve the highest, unbiased score. In all, our team made a total of 27 submissions during the contest. This report will describe a selection of the machine learning techniques we implemented throughout the entire competition, and will explain how we choose our final model.
+
+
+\section{Exploratory data analysis}
+
+ \subsection{Data visualization}
+ 
+By investigating the data with an exploratory analysis, we were able to gain a deeper understanding of the data set. The visualised data shows how a customer's decision to convert varies with their own characteristics. For example, in terms of device usage, Figure \ref{fig:eda1and2} (left) shows that the proportion of conversion for smart phones and desktop users is similar, whereas those users who are utilising other devices have only around 18% conversion.
+
+\begin{figure} [htbp]
+\begin{center}
+\includegraphics[width=2.5in]{/Users/emilysharata/Desktop/Final_Graphs/EDA/device.png}
+\includegraphics[width=2.5in]{/Users/emilysharata/Desktop/Final_Graphs/EDA/educ.png}
+\caption{Bar plots of the proportions of devices and education level with respect to conversion.}
+\label{fig:eda1and2}
+\end{center}
+\end{figure}
+
+In addition, Figure \ref{fig:eda1and2} (right) depicts the highest proportion of conversion for those with a postgraduate level of education (50%). Interestingly, a large majority of users without any formal education responded better than those with university and high  school education. This is also reflected Figure \ref{fig:eda34} (left) where students, retired and unemployed users comprise of a higher proportion of converion than other occupations which could be a possible indication that the advertisement is not being properly exposed to these users. Factors such as the time of the day the advert is published and content suitablility may need improvements. In addition, there is a 35% conversion rate visible for those with jobs classified as 'NA'. Not digging deeper into unclassified characteristics also makes it harder to optimize machine learning algorithms to reduce bias. 
+
+\begin{figure} [htbp]
+\begin{center}
+\includegraphics[width=2.5in]{/Users/emilysharata/Desktop/Final_Graphs/EDA/job.png}
+\includegraphics[width=2.5in]{/Users/emilysharata/Desktop/Final_Graphs/EDA/outcome_old.png}
+\caption{Bar plots of the proportions of jobs and old outcomes with respect to conversion.}
+\label{fig:eda34}
+\end{center}
+\end{figure}
+
+The data also suggest that the old campaign may have been inadequate. The bar chart in  Figure \ref{fig:eda34} (right) reflects the success of the old outcome in a majority conversion rate for the new advertisement. Another point of ambiguity in this predictor is the lack of differentiation between the outcome 'other' and outcome 'NA' which leads to further disadvantage in terms of gaining insights from the data and adds to the unexplained variation present in the data. 
+
+
+\begin{figure} [htbp]
+\begin{center}
+\includegraphics[width=3in]{/Users/emilysharata/Desktop/Final_Graphs/EDA/X1.png}
+\includegraphics[width=3in]{/Users/emilysharata/Desktop/Final_Graphs/EDA/X2.png}
+\includegraphics[width=3in]{/Users/emilysharata/Desktop/Final_Graphs/EDA/X3.png}
+\caption{Bar plots of unknown predictors with respect to conversion.}
+\label{eda45}
+\end{center}
+\end{figure}
+
+Furthermore, the unknown predictors 'X1' and 'X2' are unbalanced with more customers exhibiting the absence of the particular characteristics (Figure \ref{eda45}). In 'X2' it can be observed that the absence of balanced predictions in addition to the high proportion of non-conversions, can  push forward undesirable outcomes in classification of the data. 
+
+\begin{figure} [htbp]
+\begin{center}
+\includegraphics[width=5in]{/Users/emilysharata/Desktop/Final_Graphs/EDA/density.png}
+\caption{Density plots of numerical predictors.}
+\label{eda67}
+\end{center}
+\end{figure}
+
+The numerical predictors are not immune to irregularities either. Firstly, Figure \ref{eda67} (top left) shows that the age predictor has many older clients as compared to the interquartile range of 25 to 45 years. This issue arises in the variables 'banner_views', 'banner_views_old', 'days elapsed old', 'time_spent', and 'X4'. Interestingly, 'month' and 'day' exhibit many fluctuations which may be speculated as seasonality. There are many feature engineering methods which can reduce such abnormalities in data, as discussed in the next section. 
+
+\subsection{Feature engineering}
+
+Throughout the competition, we tried various feature engineering techniques in attempts to improve the performance of our models. Below is a list of some of the procedures we employed at various points through the competition.
+
+**Categorical Predictors & NA's**
+
+Many categorical predictors such as 'job' and 'marital status' contained the value of 'NA.' This can be overcome by converting this 'NA' value to 'other' since removing such observations from the dataset may increase the bias of the models implemented. By doing so, the five categorical variables of:
+
+* Job
+* Marital 
+* Education
+* Device
+* Outcome Old 
+
+are converted into binary variables through one-hot encoding, which is a method used when working with categorical data. Certain algorithms cannot work directly on categorical data, so they must be coded as dummy variables. Henceforth, the dimensionality of the data will be increased. 
+
+**Treatment of Extreme Values**
+
+As explained in the previous section, many numerical predictors are subject to extreme values, making their distributions skewed. To understand their impact in more detail, Cook's Distance was calculated, which determines the influence of an observation towards the predictions. The graph in Figure \ref{eda78} shows that there are many observations above the Cook's distance cutoff line (indicated in red) that influence the response \emph{Y}. When such values are extracted, the exact number of outliers are 346, which accounts for 4% of training data.
+
+\begin{figure} [htbp]
+\begin{center}
+\includegraphics[width=4.5in]{/Users/emilysharata/Desktop/Final_Graphs/EDA/cooks_distance.png}
+\caption{Cook's Distance plot showing dataset outliers.}
+\label{eda78}
+\end{center}
+\end{figure}
+
+With that being said, the problem can be overcome by imputing values for the outliers by using the inter-quartile ranges of each of the numerical predictors. Figure \ref{eda} shows that using this method indeed evens out the distributions and reduces extreme values for 'age', 'banner_views', 'time_spent', and 'X4'. 
+
+\begin{figure} [htbp]
+\begin{center}
+\includegraphics[width=3in]{/Users/emilysharata/Desktop/Final_Graphs/EDA/age_outlierimputation.png}
+\includegraphics[width=3in]{/Users/emilysharata/Desktop/Final_Graphs/EDA/bannerview_OutlierImputation.png}
+\includegraphics[width=3in]{/Users/emilysharata/Desktop/Final_Graphs/EDA/timespent_OutlierImputations.png}
+\includegraphics[width=3in]{/Users/emilysharata/Desktop/Final_Graphs/EDA/X4_outlierImputation.png}
+\caption{Illustration of outlier imputations for variables 'age' (top left), 'banner\_views' (top right), 'time\_spent' (bottom left), and 'X4' (bottom right).}
+\label{eda}
+\end{center}
+\end{figure}
+
+\subsection{Transformations}
+
+\begin{figure}[htbp]
+\begin{center}
+\includegraphics[width=5in]{/Users/emilysharata/Desktop/Final_Graphs/EDA/log_density.png}
+\caption{Density plots of logarithmic transformations of numerical predictors.}
+\label{eda1112}
+\end{center}
+\end{figure}
+
+A logarithmic tranformation can aid in normalizing the distribution of the given predictors. Figure \ref{eda1112} shows that after treatment of the outliers, the predictors 'age', 'X4', and 'time_spent' exhibit a bell shape, indicating that the transformation was successful for these variables.
+
+
+However, to treat the skewed nature of the rest of the numerical predictors, other methods of transformation may be required such as  Binning. Binning or bucketing, as it is also called, is a technique used to make the model more robust to outliers and prevent overfitting. It is a method of turning continuous variables into categorical variables. The values are grouped into predefined bins or buckets. Thus, some very large data points will be encompassed in a bin and no longer affect that much the variable distribution. 
+
+
+\section{Early competition techniques}
+\subsection{Early competition results}
+
+\begin{table} [!htbp]
+  \caption{Training, CV, and leaderboard accuracies of our kNN, logistic regression, and support vector machine models. \vspace{.3cm}}
+  \label{resultstable}
+  \begin{tabular}{l|c|c|c}
+  \textbf{Model} & \textbf{Training Accuracy} & \textbf{CV Accuracy} & \textbf{Kaggle Public Leaderboard Accuracy}\\
+  \hline
+  kNN & 0.825 & 0.808 & 0.512  \\
+  Logistic  Regression & 0.824 & 0.820 & 0.545  \\
+  SVM & 0.864 & 0.832 & 0.483  \\
+  \end{tabular}
+\end{table}
+
+At the beginning of the competition, we implemented many different classification algorithms to gain a baseline of their predictive performances. The results below in Table \ref{resultstable} show the accuracies for algorithms we ultimately did not use further on in the contest due to lower predictive performance. For each model we used a 10-fold cross validation. Despite the fact that they did not perform as well, we thought it was good to include in this report as they illustrate the progress we made throughout the competition.
+
+```{r}
+```
+\subsection{k-Nearest Neighbours}
+
+Early in the competition we implemented the k-nearest neighbours algorithm. This algorithm looks at similar data points within a given proximity, calculated by the Euclidean distance between them. In this method, the predictor is the distance to the given location of the response. It can be formulated as follows:
+
+\begin{equation}\label{eqKNN}
+  \hat {y_0} = 
+  \begin{cases}
+    1, & \text{if}\,\,  \frac{1}{k} \sum_{i:x\in \mathbb N_k (x_0)} 1 \{y_i =1\} >  \frac{1}{2} \\
+    0  & \text{if otherwise}\,\, 
+  \end{cases}
+\end{equation}
+
+where $\hat{y_0}$ is the predicted outcome, $N_k (x_0)$ are the $k$ closest points $x_i$ to $x_0$ and $k$ is the tuning parameter that determines the number of neighbours assigned to the algorithm. 
+
+The data was first transformed through normalization via the preprocess function provided by the caret library. The model was implemented utilizing a tune length of 20 which tests the accuracy of the model against the 20 typlical values of $k$. A 10 fold cross validation method was utilized to ensure that there was no overfitting. The best value of $k$ was found to be 25, as shown in (Figure \ref{knnacc}, top). 
+
+\begin{figure} [htbp]
+\begin{center}
+\includegraphics[width=5in]{/Users/emilysharata/Desktop/KNN/KNNAccuracy.png}
+\includegraphics[width=5in]{/Users/emilysharata/Desktop/KNN/KNNRoc.png}
+\caption{kNN accuracy and ROC plots.}
+\label{knnacc}
+\end{center}
+\end{figure}
+
+The accuracy for the training set was 82.5%. In addition to this, 10% of the training set data (that was not utilised in training the model) was used to inspect the model performance noted here as a validation set. The confusion matrix and ROC curve show that the accuracy 80.7% is and the sensitivity 72.8% (Figure  \ref{knnacc}, bottom).
+
+When the model was implemented to predict on the Kaggle test data, the prediction score was computed as 51.2%. This indicated that the kNN model may have been an overfit. Ultimately because of this algorithm's poor performance, we decided not to pursue further iterations of this model throughout the remainder of the competition. 
+
+\subsection{Logistic Regression}
+
+Another model that we attempted early in the competition was logistic regression. Logistic regression is a generalized linear model where the outcome is a two-level categorical variable. The outcome, $Y_i$, takes the value 1 (i.e., whether a 'conversion' occurs) with probability $p_i$ and the value 0 with probability $1-p_i$. It is the probability $p_i$ that we model in relation to the predictor variables.
+
+Therefore, in our logistic regression we chose to use a logit transformation as a link function. The logit transformation may be defined as: 
+
+$$
+\text{logit}\ (p_i)=\log_{e}\left(\frac{p_i}{1-p_i}\right)
+$$
+Therefore, we are able to link the predictors to outcome variable through the logit function. As can be seen below:
+$$
+\log_e\left(\frac{p_i}{1-p_i}\right)=\beta_0+\beta_1x_{1,i}+\beta_2x_{2,i}+\dots\beta_k{x}_{k,i}
+$$
+Thus, in order to use logistic regression as a classifier, we predicted all the logit $\text{probabilities}\ (p_i)$ and above a certain threshold, we classfied the outcome $Y_i$ as 1, and 0 otherwise.
+
+**Data transformation**
+
+We decided to perform a logistic regression as the outcome is of a binary nature and it is also a nice benchmark to compare our future predictive models. 
+
+In order to run a logistic regression, we first performed a log-transformation on the skewed variables, in both train and test set. Then we created a data frame containing the dummy variables, as logistic regression cannot handle categorical variables. After that, we normalized the remaining variables. Furthermore, in order to avoid multicollinearity issues, we removed one variable in each of resulting dummified variables. In our case, this included the 'NA' values.  
+
+\begin{figure} [htbp]
+\begin{center}
+\includegraphics[width=5.5in]{/Users/emilysharata/Desktop/LogReg/HeatMap.png}
+\caption{Variable heatmap showing the correlation between variables.}
+\label{HeatMap}
+\end{center}
+\end{figure}
+
+We looked at the Spearman correlation coeffcients and the VIF, to further select the variables that are not highly correlated with the others. The VIF, or variable inflation factor, detects multicollinearity between predictors. From this process, we removed the variables 'days_elapsed_old' and 'education.university'. We also produced a heat map in order to visually identify any potential multicollinearity issues in the data (Figure \ref{HeatMap}).
+
+After having cleaned our data, we ran the logistic regression using a 10 fold CV using all variables. The output of the first logistic regression model indicated which variables were significant: 'month', 'time_spent', banner_views', 'banner_views_old', 'X1', 'X3', 'X4', 'job.retired', 'job.student', 'marital.married', 'education.grad_school', 'device.desktop', 'device.smartphone', and 'outcome_old.success'. Next we ran a second logistic regression model using only these significant variables. We were left with the only remaining significant variables: 'month', 'time_spent', 'banner_views', 'banner_views_old', 'X1', 'X3', 'X4', 'job.retired', 'job.student', 'marital.married', 'education.grad_school', 'device.desktop', 'device.smartphone', and 'outcome_old.success'.
+
+We then determined the optimal cutoff value which gave the highest accuracy for the logistic model. Using the model and this cutoff value, we were able to use it to predict the classes in our training and test sets. The logistic regression had a cross validation accuracy of 82.0% and a Kaggle public leaderboard accuracy of 54.4%. Due to its low performance on the public leaderboard, we did not pursue this model any further throught the remainder of the competition. 
+
+\begin{figure} [htbp]
+\begin{center}
+\includegraphics[width=4in]{/Users/emilysharata/Desktop/LogReg/LRRoc.png}
+\caption{Logistic regression ROC curve.}
+\label{LROutput}
+\end{center}
+\end{figure}
+
+A ROC curve for this model can be found in (Figure \ref{LROutput}).
+
+\subsection{Support vector machine with Gaussian radial kernel}
+
+The support vector machine model is a frontier which best segregates two classes using extreme values. This algorithm looks at the extremes of a data set and draws boundaries at these extreme points using hyperplanes. Due to the presence of multiple predictors in this particular dataset, the data cannot be linearly separable, therefore a radial kernel was employed which utilizes the distance between $x$ and $z$ in a positively definite space:
+
+\begin{equation}\label{eqSVM1}
+ f(x) = \beta_0 + \Sigma^{n}_{i=1} \alpha_i K(x , z)
+\end{equation}
+
+where $K(x,z)$ is the radial kernel is defined as:
+
+\begin{equation}\label{eqSVM2}
+ K(x,z) = exp ( -\gamma \Sigma^{p}_{j=1} (x_j - z_j)^2)
+\end{equation}
+
+that measures the similarity between $x,z \in \mathbb R_p$ and $\gamma$ is the local tuning parameter which controls how local the fit is. When $\gamma$ is high, it means the decision boundary will only pick the training observations that are within the closest reach. Conversely, a low $\gamma$ will lead to training observations that are further away to be factored in the decision boundary. Furthermore, the cost $C$ is also a constraint, implemented in the SVM classifier as a tuning parameter. The value of $C$ can be interpreted as the complexity of the SVM model. When $C$ is large, it means there is a budget for many support vectors to be utilized which increases model complexity, and therefore leads to a small variance with a large bias. On the other hand, a small $C$ constrains the number of support vector machines which decreases the complexity of a model. This in turn decreases the bias at the expense of higher variation in the model.
+
+Since this method is reliant on distances between the records, the data was standardized using caret's preprocess function. Although the support vector machine is not reliant of the distributions of the predictors, it was found that included logarithmic transformations of numerical predictors and imputations of outliers significantly improved the predictive performance of the model.  The initial value for the tuning parameter was $C$=10 which resulted in 87.5% accuracy in the training set. However, this seemed as an over fit due to the lack of model complexity.  Therefore, to ensure the optimality of $C$ and $\gamma$ were used, this model was then cross validated over 10 folds was implemented to increase the reliability of the model. The tuning parameters $\sigma$ (equivalent to $\gamma$ in the caret package) and the $C$ used in this cross validation were:
+ 
+Sigma: $\sigma$ = (0.001, 0.01, 1)
+
+$C$ = (5, 25, 50, 100)
+
+The predictions of the cross-validated model on the validation set showed an accuracy of 76.9% with a 71.7% of sensitivity. While this was an improvement from the other geometric algorithm of k-nearest neighbours, it still had a lower accuracy than our models using regression trees, random forests and boosting. The fit plot (Figure \ref{SVMFit}, top) shows that the final model used $C$ = 5 and $\gamma$ = 0.01. This low cost meant that the complexity of the final chosen model was low, indicating a high bias in the predictions. Due to the low predictive performance of this model, we did not pursue it further in the competition.
+
+\begin{figure} [htbp]
+\begin{center}
+\includegraphics[width=5in]{/Users/emilysharata/Desktop/SVM/SVMFit.png}
+\includegraphics[width=5in]{/Users/emilysharata/Desktop/SVM/SVMRoc.png}
+\caption{Support vector machine fit plot (top), and ROC plot (bottom).}
+\label{SVMFit}
+\end{center}
+\end{figure}
+
+A ROC curve was also produced for this model (Figure  \ref{SVMFit}, bottom).
+
+\section{Late competition methods}
+
+As the competition continued, we achieved the best results using neural nets, random forests, and boosted decision trees. We therefore focused most of our time in the second half of the contest improving these models.
+
+\subsection{Late competition results}
+
+The results below in Table \ref{endresultstable} show the accuracies for algorithms we focused on due to their high performance. For each model we used a 10-fold cross validation. 
+
+\begin{table} [htbp]
+  \caption{The cross validated training and leaderboard accuracies of our best neural net, random forest, and boosted decision tree models.\vspace{.3cm}}
+  \label{endresultstable}
+  \vspace{.1cm}
+  \begin{tabular}{l|c|c}
+  \textbf{Model} & \textbf{CV Training Accuracy} & \textbf{Kaggle Public Leaderboard Accuracy}\\
+  \hline
+  Deep neural net & 0.850 & 0.823  \\
+  Random forest & 1.00 & 0.859  \\
+  Boosted decision trees & 0.898 & 0.870  \\
+  \end{tabular}
+\end{table}
+
+\subsection{Deep neural network}
+
+**Model description**
+
+Throughout the competition we built many neural network models which achieved good results. Therefore we decided to expand this model with a deep neural network. The neural network model is composed of three part: the input layer, the hidden layers and the output layer. The layers are composed of nodes, called *neurons*. In the input layer, we have a neuron per component, in our case a neuron for each predictors. Each hidden layer is composed of different number of neurons. Finally the output layer has a single neuron, our outcome variable $Y_i$. It is in the hidden layers where all the processing actually happens through a system of connections characterized by weights and biases: the input is received, the neuron calculate a weighted sum adding also the bias and thanks to different activation functions a result for the outcome $Y_i$ is obtained. 
+
+For our best performing model, a relu activation function was used, except for the output layer, where a sigmoid activation function was used. The activation function goal is to introduce non-linearity in the model framework. 
+
+After obtaining the first results from the forward pass, the model measures the accuracy thanks to the binary cross-entropy loss function: $\mathcal{L}(\theta)= -\frac{1}{n}\sum_{i=1}^n \left[y_i \log(p_i) + (1-y_i)\log(1-p_i) \right]$. By doing so, it measures the performance of the classification model whose output is a probability value between 0 and 1. If the result is very far from the actual outcome, the binary cross-entropy loss increases as the predicted probability diverges from the actual outcome $Y_i$. By having this information, the model is able to update the assigned weights to each neurons through back-propagation, thus improving accuracy. Thus, the neural networks are very prone to overfitting. 
+
+To tackle this overfitting and to have a more robust model, we applied some regularization techniques. For instance, in our fully connected model we used L2 regularization, dropout and early stopping. The L2 regularization is interesting as it assigns a smaller value to the weights to penalize the size of the parameters, but not pushing it towards zero, so all neurons are kept. In addition, the dropout method is used to not take into account some random portion of the neurons, during the model fitting process. In our model the dropout rate was 20% for the first layers and 10% for the last hidden layer. This is useful as this makes the model more robust by making each unit to learn independetly from the dropped units. The early stopping regularization technique is particularly useful as it monitors the training error and the test error and will stop the fitting process when the model is overfitting, i.e. when the test error stops decreasing. Moreover, as there are many parameters and many observations, we used batch oprimization in order to economize on the computational cost at every iteration. Thus, the stochastic gradient descent samples only a subset of summand functions at every step. In our case we set the batch size to 50 samples.
+
+**Model implementation**
+
+The datset we were provided however needed some feature engineering to achieve a better accuracy, and also simply to be fitted for neural networks. 
+
+First of all, as the variables 'age' and 'time_spent' were skewed, we did a log transformation. Secondly, the variable 'banner_views_old' was transformed into a categorical variable, with two categories: 'seen' and 'not seen', with regards to the old banner. Then, for the variable 'month' we did bucketing, i.e. we transformed the variable numerical values into 4 categories : 'winter', 'spring', 'summer', and 'fall'. Regarding the variables 'banner_views' and 'X4', we also did bucketing, but this time we the quantiles in order to bin together the values while preserving the initial distribution properties. Finally, the variable 'days_elapsed_old' was removed as it was higly correlated (97%) with variable 'banner_views_old'. Moreover, the variable contained a vast majority of -1 values, making the majority of the observations not useful. 
+
+Nonetheless, before applying the neural network framework, we also preprocessed the data. To do so, we applied one-hot encoding for the categorical variables. Then, we removed one variable in each predictor category to avoid multicollinearity issues. Finally, in order to have a dataset suited for neural networks, we forced all the remaining variables to lay between a range of [0;1]. All these transformations resulted in having 44 predictors for our outcome value $Y_i$.
+
+The model architecture was the following: 6 layers in total. The input layer, 4 hidden layers and the output layer. The first layer contained 44 neurons, the hidden layers contained 25, 20, 15 an 10 neurons, respectively, and finally the output layer contained one neuron for the outcome. The number of epochs used was 120 in order to train our model, i.e. the model did 120 iterations over the entire training set. In addition, the validation split was 10%, meaning that we use 10% of the training dataset to monitor our accuracy.
+
+\begin{figure} [htbp]
+\begin{center}
+\includegraphics[width=4in]{/Users/emilysharata/Desktop/NeuralNets/NNetAccuracy.png}
+\caption{Training and validation accuracies for the deep neural net.}
+\label{NNetAccuracy}
+\end{center}
+\end{figure}
+
+As we can observe from the history plot in Figure  \ref{NNetAccuracy}, our training and validation accuracies are very close to each other, while at the same time the training accuracy curve was never above the validation accuracy curve. This indicated that our model was not overfitting. Thus, this confirmed our regularizations techniques had worked as expected. Furthermore, we observed that the epoch iterations stopped just before the 80th iteration, due to the early stopping regularization method. To conclude, the neural network performed quite well as the training accuracy was 85.0%, while the test accuracy on the public Kaggle leaderboard was 82.3% on the whole test set. 
+
+\begin{figure} [!htbp]
+\begin{center}
+\includegraphics[width=4in]{/Users/emilysharata/Desktop/NeuralNets/NNetROC.png}
+\caption{Deep neural net ROC curve.}
+\label{NNetROC}
+\end{center}
+\end{figure}
+
+Figure \ref{NNetROC} shows the ROC for this model. 
+
+\subsection{Random Forest}
+
+**Model description**
+
+The random forest algorithm is a tree based method. Tree based methods work by splitting the feature space $(X_1, ..., X_p)$ into into $J$ non-overlapping regions $R_1,...,R_j$ using predictors $p$ and specified cutoff points $t$. The prediction in a region $R_j$ is the constant $\hat{y}R_j$ that is the most commonly occuring class of the training observations in $R_j$. Random Forests utilize bootstrap aggregating, or bagging, and are a good alternative to the poor predictive performance of single trees, which typically have high variance. Random Forests make predictions by growing many decorrelated trees on bootstrapped samples. When growing the trees, for each split only $m$ of $p$ predictors are used, ensuring the decorrelation. 
+
+\begin{figure} [!htbp]
+\begin{center}
+\includegraphics[width=4in]{/Users/emilysharata/Desktop/RF/RFROC.png}
+\caption{Random forest ROC curve.}
+\label{RFROC}
+\end{center}
+\end{figure}
+
+When validating the random forest algorithm, we used 10-fold cross validation. The algorithm is most affected by two parameters: \emph{ntrees}, which controls the number of decorrelated trees grown, and \emph{mtry}, which determines the number of variables randomly sampled as candidates at each split.
+Random forests handle well categorical and quantitative data, thus no data transformation was needed. However, we discovered that when removing the variable 'outcome_old,' which contains many missing data, the perfomance increased. Therefore in our highest performing random forest model we did not include this variable. 
+
+We also produced a ROC curve for the Random Forest model (Figure  \ref{RFROC}). 
+
+We determined that the ideal values for the hyperparameters were \emph{mtry} = 14 and \emph{ntree} = 2000. When we used these hyperparmeters to build the Random Forest model, we achieved an accuracy of 85.9% on Kaggle's public leaderboard. We considered this to be a good result, despite the fact that we were clearly overfitting our training dataset, which obtained an accuracy of 100% even though we used 10 fold cross validation. 
+
+\subsection{Boosted Decision Trees}
+
+Throughout the competition we built many boosted decision tree models using the package XGBoost. In boosting, many trees are grown sequentially in order to further minimize the residuals. In our final models built using this algorithm, choose to tune four parameters in a cross validated exhaustive grid search: the number of trees $B$, the shrinkage parameter $\lambda$, and the number of splits in each tree $d$, and the minimum loss reduction required to make a split $\gamma$. $\lambda$ is usually set to a positive number less than 0.1, and it controls how quickly the algorithm 'learns' from one tree to the next. The boosted model with trees $\hat{f}_b$ can be written as:
+
+\begin{equation}
+\hat{f}(x) = \sum_{b=1}^B \lambda \hat{f}_b(x)
+\end{equation}
+
+We built many models using XGBoost with feature engineering of the dataset. However, many of these manipulations did not result in higher training or public accuracies. We also built many other models using the technique of early stopping . Using early stopping explicitly avoids overfitting the train data by monitoring when the accuracy on the test data set is no longer improving. Though this procedure gives a useful way to keep the model from being biased to the training data set, it requires the train data set to be further subdivided into test and train data sets, which limits the amount of true training data that can be used in fitting the model. Therefore, for our final XGBoost model, rather than focusing efforts on feature engineering or early stopping, we changed our strategy to fine tuning the model to obtain the optimal hyperparameters. We chose to train on the entire training dataset in order to have the maximum number of data points to cross validate on, and treated the public leaderboard score as a true test set. Cross validation was employed to remove as much variance as possible.
+
+\begin{figure} [htbp]
+\begin{center}
+\includegraphics[width=4in]{/Users/emilysharata/Desktop/XGBoost/XGBGraph.png}
+\includegraphics[width=4in]{/Users/emilysharata/Desktop/XGBoost/XGBROC.png}
+\caption{Average XGBoost test accuracy from repeated CV for various hyper-parameters (top) and ROC plot (bottom).}
+\label{XGBGraph}
+\end{center}
+\end{figure}
+
+We worked with the training dataset in its original form, only removing the variable 'outcome_old' due to its many missing values. We tuned the model using an expansive grid search on the hyper-parameters $B$, $\lambda$, $d$, and $\gamma$. We used a 10 fold cross validation with three repeats. The values we selected for the grid search were taken from our previous XGBoost models that had performed well. We then performed a second grid search, narrowing closer in on values that found optimal by the first search.  Finally, we did a third grid search, again focusing in more closely to the values identified as the best tune from the second grid search. For this final tune we chose to use a 10 fold repeated cross validation with 5 repeats. This repeated cross validation allowed us to determine the most robust parameters. Figure \ref{XGBGraph} (top) shows the average test accuracy from repeated cross validation of the training set for different hyper-parameter combinations tested during the final grid search optimization procedure.
+
+
+
+The optimal parameters were found to be $B$ = 150, $d$ = 5, $\lambda$ = 0.08, and $\gamma$ = 3. This achieved a cross validated training accuracy of 89.8%, and an accuracy of 87.0% on the Kaggle public leaderboard.
+
+We also made a ROC Curve for this model, as seen in Figure \ref{XGBGraph} (bottom).
+
+
+\subsection{Ensemble Method}
+
+We decided to build an ensemble model using three of our top performing algorithms: a neural net, a random forest, and a gradient boosted decision tree. Ensemble methods are used in machine learning because they typically can achieve better predictive performance than a single algorithm. There exists various types of ensembles, but we chose to use simple majority voting. In this type of ensemble, each individual model ‘votes’ for each record, and the final prediction is the class that receives the most votes. Though more computationally expensive, ensembles are less likely to overfit the training data. Our ensemble achieved a training accuracy of 92.2% and a Kaggle public leaderboard accuracy of 86.0%.
+
+\section{Selection of the final model}
+
+Table \ref{table} compares the accuracies of the ensemble and gradient boosted decision tree models we considered selecting for the final score.
+
+\begin{table} [htbp]
+  \caption{Thee cross validated training and public leaderboard accuracies comparing the ensemble and gradient boosted decision tree models. \vspace{.3cm}}
+  \label{table}
+  \vspace{.1cm}
+  \begin{tabular}{l|c|c}
+  \textbf{Model} & \textbf{CV Training Accuracy} & \textbf{Kaggle Public Leaderboard Accuracy}\\
+  \hline
+  Ensemble model & 0.922 & 0.860  \\
+  Boosted decision trees & 0.898 & 0.870 \\
+  \end{tabular}
+\end{table}
+
+We decided to compare how some of our top models performed. Figure \ref{barplot} shows the distribution of the conversion rate in the test set across the top performing algorithms. Although the rates seem largely similar, it can be seen that the deep neural nets were underfitting. In addition to this, the bar 'XGB8' reflects the predictions of the cross validated model, here it shows a relatively higher proportion of conversions, which in the private Kaggle leaderboard reflected an overfitting. We have always been mindful of the fact that the best performing algorithms such as random forest ensure a degree of weak dependence among predictions. 
+
+\begin{figure} [htbp]
+\begin{center}
+\includegraphics[width=4in]{/Users/emilysharata/Desktop/Final_Graphs/Results/barplot}
+\caption{Conversion rate for various model submissions.}
+\label{barplot}
+\end{center}
+\end{figure}
+
+The correlation matrix of the most adequate algorithms implemented in the analysis shows a low correlation between the predictions of the neural network (NeuralNet_1.1 in the Figure \ref{corplot}) and the random forest (Random_Forest_New) predictions, indicating a potentially low variance in the final model. The XGBoosted predictions show high correlations with random forest which is implied due to similar methodologies in the growth of trees. 
+
+\begin{figure} [htbp]
+\begin{center}
+\includegraphics[width=4in]{/Users/emilysharata/Desktop/Final_Graphs/Results/corplot.png}
+\caption{Correlation plot for various model submissions.}
+\label{corplot}
+\end{center}
+\end{figure}
+
+
+Keeping this in mind, to select the final model used for the final Kaggle score, we considered the highest  performing  individual model with XGBoost, and an ensemble method combining our three most performant models. Table \ref{table} shows the accuracies of the ensemble method and the gradient boosted tree model. 
+
+
+Ultimately we chose the boosted decision tree as the final model. It had the smallest difference in training and test scores (public leaderboard). While the ensemble method should reduce bias when averaging over several models, it had a significantly larger difference between the training and test accuracies. Furthermore, the ensemble’s test score was both lower than the boosted decision tree and the sample submissions. We were also concerned that three models used in the ensemble did not have equal performance, and thus we were unsure if the ensemble would perform as well as our best single cross validated model. Despite what we knew about the generally great performance of ensemble methods, we ended up choosing the single boosted decision tree model.
+
+
+\section{Conclusion and discussion}
+
+The results below in Table \ref{completeresults} reveal the public leaderboard accuracies of the ensemble model and its individual components. 
+
+\begin{table} [htbp]
+  \caption{Training, CV, public leaderboard, and private leaderboard accuracies of our best neural net, random forest, boosted decision tree, and ensemble models.}
+  \label{completeresults}
+  \vspace{.1cm}
+  \begin{tabular}{l|c|c|c}
+  \textbf{Model} & \textbf{CV Train Accuracy} & \textbf{Kaggle Public Accuracy} & \textbf{Kaggle Private Accuracy}\\
+  \hline
+  Deep neural net & 0.850 & 0.823 & 0.820 \\
+  Random forest & 1.00 & 0.859 & 0.858 \\
+  Boosted decision trees & 0.898 & 0.870 & 0.858\\
+  Ensemble model & 0.922 & 0.860 & 0.864\\
+  \end{tabular}
+\end{table}
+
+Once the results of the private leaderboard were made known to us, it was clear that the ensemble method should have been chosen as our final score. Furthermore, the random forest used in the ensemble performed just as well as the gradient boosted tree. Therefore, from the results it was evident that the ensemble was the more robust choice. As we can see from Table \ref{completeresults}, the accuracies from from the public and private leaderboards were closest together for the ensemble method. This demonstrated that the ensemble method was indeed better at reducing variance than the boosted decision tree.  
+
+Overall, the findings of this analysis show how the same data can be subject to an array of interpretations through different models. The cross-validations conducted for each model paint a true picture of the validity of some models. For example, algorithms such as the logistic regression and k-nearest neighbours proved to be heavily overfitted even though cross validation was used. On the other hand, deep neural networks with multiple hidden layers have also produced disoriented results in the Kaggle test set. This proves that at the core of machine learning, lies a very delicate  balance between parsimony and complexity. 
+
+
+

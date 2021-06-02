@@ -1,0 +1,130 @@
+---
+title: "Neural Network"
+author: "Ameera KHAN"
+date: "4/29/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+setwd("C://Users//khan_//Documents//MABAN//ML//Competition")
+#libraries used
+# tensorflow::install_tensorflow()
+library(keras)
+library(tidyverse)
+library(caret)
+library(tensorflow)
+library(kerasR)
+#normalised data without feature engineering 
+train_norm = read.csv("train_transformed.csv")
+valid_norm = read.csv("valid_transformed.csv")
+test_norm = read.csv("test_transformed.csv")
+train_norm = train_norm[-c(1)]
+valid_norm = valid_norm[-c(1)]
+test_norm = test_norm[-c(1)]
+
+#Stepwise Logistic Regression
+# set.seed(1)
+# full.model <- glm(y ~., data = train_norm, family = binomial)
+# library(MASS)
+# step.model <- full.model %>% stepAIC(trace = FALSE)
+# #comparison of both models 
+# summary(full.model)
+# coef(step.model)
+# #creating data frames with only stepwise model predictors 
+# step_vars <- names(coef(step.model))
+# train_step <- as.data.frame(subset( train_norm, select = step_vars[-1]))
+# train_step$y <- train_norm$y
+# 
+# 
+# valid_step <- as.data.frame(subset( valid_norm, select = step_vars[-1]))
+# valid_step$y <- valid_norm$y
+
+```
+
+## Setting Up the Neural Net  
+```{r}
+#preparing matrices for training, 
+set.seed(1)
+
+X_train <- train_norm %>% 
+   select(- y) 
+
+X_train = data.matrix(X_train)
+
+y_train = train_norm$y 
+
+#validation 
+X_valid <- valid_norm %>% 
+ select(-y) 
+
+
+X_valid = data.matrix(X_valid)
+
+y_valid = valid_norm$y
+
+model <- keras_model_sequential()
+ model %>%
+   # Input layer
+ layer_dense(units = 256, activation = "relu", input_shape =  ncol(X_train)) %>% 
+ layer_dropout(rate = 0.6) %>% 
+   # Hidden layer
+ layer_dense(units = 75, activation = "relu") %>%
+    layer_dropout(rate = 0.3) %>% 
+   # Hidden layer
+ layer_dense(units = 75, activation = "relu") %>%
+    layer_dropout(rate = 0.3) %>%
+       # Hidden layer
+ layer_dense(units = 75, activation = "relu") %>%
+    layer_dropout(rate = 0.3) %>%
+ #Output Layer
+ layer_dropout(rate = 0.3) %>%
+ layer_dense(units = 1, activation = "sigmoid")
+ 
+ history <- model %>% compile(
+ loss = "binary_crossentropy",
+ optimizer = "Adam",
+ metrics = "accuracy"
+)
+# Running our data
+model %>% fit(
+ X_train, y_train, 
+ epochs = 100, 
+ batch_size = 64,
+ validation_split = 0.4
+)
+summary(model)
+# Calculating accuracy
+valid_predictions <- model %>% predict_classes(X_valid)
+#confusionmatrix 
+confusionMatrix(as.factor(valid_predictions), as.factor(valid_norm$y))
+
+# par<- c("HiddenLayers", "Epochs", "Optimizer", "DropOutRate", "BatchSize", Transformation", "Accuracy")
+#res1<- c(2, 50, "SGD","0,5 , 0.8, 0.8, 0.3", 5, "No transfomation", 82.77 )
+#res2<- c(2, 50, "SGD","0,5 , 0.8, 0.8, 0.3",5,  "Removing Outcome Old", 82.30 )
+#res3<- c(2, 50, "Adam","0,5 , 0.8, 0.8, 0.3", 5, "No transfomation", 83.00)
+#res4<- c(2, 50, "Adam","0,5 , 0.8, 0.8, 0.3", 10,  "No transfomation", 83.82)
+#res5<- c(2, 50, "Adam","0,5 , 0.8, 0.8, 0.3", 15,  "No transfomation", 84.41)
+#res6<- c(2, 50, "Adam","0,5 , 0.8, 0.8, 0.3", 30,  "No transfomation", 85.35)
+#res7<- c(2, 50, "Adam","0,5 , 0.8, 0.8, 0.3", 100,  "No transfomation", 87.33)
+#res8<- c(2, 50, "Adamax","0,5 , 0.8, 0.8, 0.3", 100,  "No transfomation", 82.81)
+#res9<- c(2, 50, "SGD","0,5 , 0.8, 0.8, 0.3", 100,  "No transfomation", 64.95)
+#res10<- c(2, 50, "SGD", "0,5 , 0.8, 0.8, 0.3", 64  "No transfomation", 81.01)
+#res9<- c(2, 50, "Adam","0,5 , 0.8, 0.8, 0.3", 100,  "Step Wise ", 85.11)
+
+#Predicting on the test set 
+X_test=  test_norm %>% 
+   select(- ID) 
+X_test = data.matrix(X_test)
+y_test<- model %>% predict_classes(X_test)
+y_test.pred.id<-data.frame(ID=test_norm$ID, y=y_test)
+colnames(y_test.pred.id)[2]<-'y'
+head(y_test.pred.id)
+
+write.csv(y_test.pred.id, "Keras_NNet2.csv", row.names=FALSE)
+old.try.rf<-read.csv('kaggleRFtry1.csv')
+hist(as.integer(old.try.rf$y == y_test.pred.id$y))
+```

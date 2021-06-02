@@ -1,0 +1,33 @@
+---
+title: "Principle Component Analysis"
+author: "Ameera KHAN"
+date: "4/23/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(devtools)
+install_github("vqv/ggbiplot")
+library(ggbiplot)
+library(ggplot2)
+library(factoextra)
+```
+
+```{r}
+setwd("C://Users//khan_//Documents//MABAN//ML//Competition")
+train.scaled.df <- read.csv("train_norm.csv")
+train.unscaled.df <- read.csv("train.csv")
+#removing ID varaible
+train.scaled.df <- train.scaled.df[-c(1)]
+train.unscaled.df <- train.unscaled.df[-c(1)]
+#applying PCA
+pca.scaled <- prcomp(train.scaled.df, center = FALSE,scale. = FALSE)
+summary(pca.scaled)
+#PCA 1 & PCA 2
+ggbiplot(pca.scaled,ellipse=TRUE, circle=TRUE,obs.scale = 1 , var.scale = 1,var.axes=FALSE, alpha=0) +
+  ggtitle("PCA of Online News Popularity (PCA1 & PCA2)")+ theme_minimal()+ theme(legend.position ="bottom")
+```

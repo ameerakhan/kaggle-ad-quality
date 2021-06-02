@@ -1,0 +1,64 @@
+---
+title: "K Nearest Neighbours"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+#KNN
+library(caret)
+library(tidyverse)
+library(formattable)
+#ROC Plot
+library(plotROC)
+library(pROC)
+```
+
+```{r include=FALSE}
+train.norm <- read.csv("train_norm.csv")
+train.norm<- train.norm[-c(1)]
+valid.norm <- read.csv("valid_norm.csv")
+valid.norm<- valid.norm[-c(1)]
+test.norm <- read.csv("test_norm.csv")
+test.norm<- test.norm[-c(1)]
+```
+
+
+## KNN R code
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+set.seed(1)
+ctrl <- trainControl(method="repeatedcv",repeats = 10) #,classProbs=TRUE,summaryFunction = twoClassSummary)
+knnFit <- train(as.factor(y) ~ ., data = train.norm, method = "knn", trControl = ctrl, tuneLength = 20)
+
+#Output of kNN fit
+knnFit 
+formattable(getTrainPerf(knnFit)) #training error
+knnFit$bestTune #optimal value of k
+ggplot(knnFit) + geom_line() + geom_smooth() + theme_light() #RMSE vs Number of numbers 
+knn.predicted.classes <- knnFit %>% predict(train.norm) #prediction error for training 
+confusionMatrix(knn.predicted.classes, as.factor(train.norm$y), positive= '1')
+head(knn.predicted.classes)
+
+
+#Predicting on the validation set (10% of training)
+knn.pred.valid <- knnFit %>% predict(valid.norm) #prediction error for training 
+cm.knn.valid <- confusionMatrix(knn.pred.valid, as.factor(valid.norm$y), positive= '1')
+#ROC curve for validation set
+knn.valid.res <- as.data.frame(cbind(as.numeric(as.character(knn.pred.valid)), valid.norm$y))
+colnames(knn.valid.res) <- c("predicted", "actual")
+knn.roc <- ggplot(knn.valid.res, aes(d=actual, m=predicted))+ geom_roc(labels=FALSE)+style_roc() +ggtitle("Validation Set ROC for K-NN fit with k =25")
+knn.roc
+#Prediciting on the test set given to us 
+knn.test.res <- knnFit %>% predict(test.norm) #prediction error for training
+knn.res<- as.data.frame(cbind(test.norm$ID, as.numeric(as.character(knn.test.res))))
+#saving results
+res_names <- c("ID","y")
+colnames(knn.res)<- res_names
+#write.csv(knn.res,"Submission_COVIDMASTERS_KNN.csv")
+```
